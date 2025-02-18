@@ -183,3 +183,26 @@ if __name__ == "__main__":
     window = OBD2Lumeon()
     window.show()
     sys.exit(app.exec())
+# Instalar dependencias necesarias
+pip install obd pyttsx3 SpeechRecognition PyQt6
+
+# Inicializar Git si aún no lo has hecho
+git init
+
+# Agregar archivos al repositorio
+git add .
+
+# Hacer un commit con el mensaje "Subiendo OBD2 LUMEON"
+git commit -m "Subiendo OBD2 LUMEON"
+
+# Configurar la rama principal
+git branch -M main
+
+# Agregar el repositorio remoto (cambia "TuUsuario" por tu nombre de usuario en GitHub)
+git remote add origin https://github.com/TuUsuario/OBD2-LUMEON.git
+
+# Subir los archivos al repositorio
+git push -u origin main
+
+# Ejecutar la aplicación OBD2 LUMEON
+python obd2_lumeon.py

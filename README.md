@@ -206,3 +206,6 @@ git push -u origin main
 
 # Ejecutar la aplicación OBD2 LUMEON
 python obd2_lumeon.py
+
+chmod +x setup_obd2_lumeon.sh
+./setup_obd2_lumeon.sh

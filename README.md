@@ -1006,3 +1006,95 @@ if __name__ == "__main__":
     window = AutoCrewChat()
     window.show()
     sys.exit(app.exec())
+import sys
+import requests
+import json
+import speech_recognition as sr
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt
+
+OBD2_API = "https://obd2-database.com/api/errors"  # Simulación de API
+
+class OBD2LumeonVoice(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("OBD2 LUMEON - Control por Voz")
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("🎙️ Control por Voz - OBD2 LUMEON")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.result_display = QTextEdit()
+        self.result_display.setFont(QFont("Arial", 12))
+        self.result_display.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.result_display.setReadOnly(True)
+        layout.addWidget(self.result_display)
+
+        self.voice_button = self.create_3d_button("🎤 Activar Voz", self.voice_command)
+        layout.addWidget(self.voice_button)
+
+        self.setLayout(layout)
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def voice_command(self):
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            self.result_display.setText("🎙️ Escuchando... Di un comando como 'Escanear coche'")
+            try:
+                audio = recognizer.listen(source)
+                command = recognizer.recognize_google(audio, language="es-ES").lower()
+                self.process_command(command)
+            except sr.UnknownValueError:
+                self.result_display.setText("❌ No se entendió el comando, intenta de nuevo.")
+            except sr.RequestError:
+                self.result_display.setText("⚠️ Error en el servicio de reconocimiento.")
+
+    def process_command(self, command):
+        if "escanear coche" in command:
+            self.result_display.setText("🔍 Iniciando diagnóstico...")
+            response = requests.get(f"{OBD2_API}/scan")
+            if response.status_code == 200:
+                data = response.json()
+                errors = "\n".join([f"⚠️ Código {err['code']}: {err['description']}" for err in data["errors"]])
+                self.result_display.setText(errors)
+            else:
+                self.result_display.setText("🚗 No se encontraron errores en el coche.")
+        else:
+            self.result_display.setText("🤔 Comando no reconocido. Intenta 'Escanear coche'.")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonVoice()
+    window.show()
+    sys.exit(app.exec())

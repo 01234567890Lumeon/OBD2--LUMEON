@@ -1869,3 +1869,220 @@ if __name__ == "__main__":
     window = OBD2Lumeon()
     window.show()
     sys.exit(app.exec())
+import sys
+import os
+import json
+import threading
+import requests
+from obd import OBD, commands, OBDStatus
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, 
+                            QLabel, QTextEdit, QHBoxLayout, QTabWidget, QProgressBar)
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
+
+# Configuración APIs
+HIGH_MOBILITY_API_KEY = os.getenv("HIGH_MOBILITY_API_KEY", "tu_api_key_here")
+OBD_ADAPTER_PORT = "/dev/rfcomm0"  # Cambiar según SO
+
+class RealTimeAPIs(QObject):
+    battery_update = pyqtSignal(dict)
+    dtc_details = pyqtSignal(dict)
+    
+    def __init__(self):
+        super().__init__()
+        self.obd_conn = OBD(OBD_ADAPTER_PORT)
+        
+    def get_ev_battery_status(self, vin):
+        """API High Mobility - Estado de batería para vehículos eléctricos"""
+        url = f"https://api.high-mobility.com/v2/vehicles/{vin}/battery"
+        try:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {HIGH_MOBILITY_API_KEY}"},
+                timeout=10
+            )
+            self.battery_update.emit(response.json() if response.status_code == 200 else {})
+        except Exception as e:
+            print(f"Error API High Mobility: {str(e)}")
+    
+    def get_enhanced_dtc_info(self, code):
+        """API LibreDiagnostic - Base de datos extendida de DTCs (requiere clave)"""
+        url = f"https://api.librediagnostic.com/v1/dtcs/{code}"
+        try:
+            response = requests.get(url, timeout=8)
+            self.dtc_details.emit(response.json())
+        except Exception as e:
+            print(f"Error API DTC: {str(e)}")
+
+class OBD2Pro(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("OBD2 LUMEON PRO")
+        self.setGeometry(100, 100, 1024, 768)
+        self._setup_ui()
+        self._init_apis()
+        self._create_tabs()
+        self.live_data_timer = QTimer()
+        self.live_data_timer.timeout.connect(self.update_live_data)
+        
+    def _setup_ui(self):
+        self.main_layout = QVBoxLayout()
+        
+        # Barra de estado
+        self.status_bar = QLabel("Conectando al adaptador OBD...")
+        self.status_bar.setStyleSheet("background: #2A2A2A; color: #00FF00; padding: 5px;")
+        
+        # Controles principales
+        self.scan_btn = self._create_button("Escanear sistemas", self._start_full_scan)
+        self.stop_btn = self._create_button("Detener", self._stop_scan, enabled=False)
+        
+        # Barra de progreso
+        self.progress = QProgressBar()
+        self.progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #00FFFF;
+                border-radius: 5px;
+                text-align: center;
+                height: 20px;
+            }
+            QProgressBar::chunk {
+                background: #00FFFF;
+            }
+        """)
+        
+        self.main_layout.addWidget(self.status_bar)
+        self.main_layout.addWidget(self.progress)
+        self.main_layout.addWidget(self.scan_btn)
+        self.main_layout.addWidget(self.stop_btn)
+        self.setLayout(self.main_layout)
+    
+    def _init_apis(self):
+        self.api_thread = threading.Thread(target=self._init_api_connections)
+        self.api_thread.start()
+        
+    def _init_api_connections(self):
+        self.apis = RealTimeAPIs()
+        self.apis.battery_update.connect(self._update_battery_tab)
+        self.apis.dtc_details.connect(self._update_dtc_details)
+    
+    def _create_tabs(self):
+        self.tabs = QTabWidget()
+        
+        # Pestaña de diagnóstico
+        self.diag_tab = QTextEdit()
+        self.diag_tab.setReadOnly(True)
+        
+        # Pestaña de batería (EV)
+        self.battery_tab = QTextEdit()
+        
+        # Pestaña técnica
+        self.tech_tab = QTextEdit()
+        
+        self.tabs.addTab(self.diag_tab, "Diagnóstico")
+        self.tabs.addTab(self.battery_tab, "Estado Batería")
+        self.tabs.addTab(self.tech_tab, "Detalles Técnicos")
+        
+        self.main_layout.insertWidget(0, self.tabs)
+    
+    def _create_button(self, text, callback, enabled=True):
+        btn = QPushButton(text)
+        btn.clicked.connect(callback)
+        btn.setEnabled(enabled)
+        btn.setStyleSheet("""
+            QPushButton {
+                background: #004D40;
+                color: white;
+                border: none;
+                padding: 10px;
+                font-weight: bold;
+                min-width: 150px;
+            }
+            QPushButton:disabled {
+                background: #424242;
+                color: #757575;
+            }
+        """)
+        return btn
+    
+    def _start_full_scan(self):
+        self.scan_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.progress.setValue(0)
+        self.live_data_timer.start(1000)
+        
+        # Escaneo completo en segundo plano
+        self.scan_thread = threading.Thread(target=self._perform_obd_scan)
+        self.scan_thread.start()
+    
+    def _perform_obd_scan(self):
+        try:
+            if self.apis.obd_conn.status() == OBDStatus.CAR_CONNECTED:
+                # 1. Obtener VIN
+                vin = self.apis.obd_conn.query(commands.VIN).value
+                self._emit_status(f"VIN detectado: {vin}")
+                
+                # 2. Consultar API High Mobility
+                self.apis.get_ev_battery_status(vin)
+                self.progress.setValue(30)
+                
+                # 3. Escanear DTCs
+                dtcs = self.apis.obd_conn.query(commands.GET_DTC).value
+                self.progress.setValue(60)
+                
+                # 4. Obtener detalles técnicos
+                for dtc in dtcs:
+                    self.apis.get_enhanced_dtc_info(dtc[0])
+                
+                self.progress.setValue(100)
+                self._emit_status("Escaneo completo")
+                
+        except Exception as e:
+            self._emit_status(f"Error de escaneo: {str(e)}")
+    
+    def update_live_data(self):
+        if self.apis.obd_conn.status() == OBDStatus.CAR_CONNECTED:
+            data = {
+                "rpm": self.apis.obd_conn.query(commands.RPM).value.magnitude,
+                "speed": self.apis.obd_conn.query(commands.SPEED).value.magnitude,
+                "temp": self.apis.obd_conn.query(commands.COOLANT_TEMP).value.magnitude
+            }
+            self.diag_tab.append(json.dumps(data, indent=2))
+    
+    def _update_battery_tab(self, data):
+        if data:
+            self.battery_tab.setText(f"""
+                Nivel de carga: {data.get('level', 'N/A')}%
+                Voltaje: {data.get('voltage', 'N/A')}V
+                Temperatura: {data.get('temp', 'N/A')}°C
+            """)
+    
+    def _update_dtc_details(self, data):
+        if data:
+            self.tech_tab.append(f"""
+                Código: {data['code']}
+                Severidad: {data['severity']}
+                Solución recomendada: {data['solution']}
+            """)
+    
+    def _stop_scan(self):
+        self.live_data_timer.stop()
+        self.scan_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.progress.setValue(0)
+        self._emit_status("Escaneo detenido")
+    
+    def _emit_status(self, message):
+        self.status_bar.setText(f"Estado: {message}")
+    
+    def closeEvent(self, event):
+        self._stop_scan()
+        if self.apis.obd_conn:
+            self.apis.obd_conn.close()
+        event.accept()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2Pro()
+    window.show()
+    sys.exit(app.exec())
+    

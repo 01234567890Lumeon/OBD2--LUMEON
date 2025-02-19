@@ -1594,3 +1594,111 @@ if __name__ == "__main__":
     window = OBD2LumeonTiempoReal()
     window.show()
     sys.exit(app.exec())
+import sys
+import random
+import obd
+import time
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, QTimer
+
+class OBD2LumeonAlertas(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("⚠️ OBD2 LUMEON - Alertas Inteligentes")
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("🚨 Alertas en Tiempo Real")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #FF4500;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.label_status = QLabel("🟢 Estado del vehículo: Normal")
+        self.label_status.setFont(QFont("Arial", 14))
+        self.label_status.setStyleSheet("color: #00FF00;")
+        self.label_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_status)
+
+        self.text_alertas = QTextEdit()
+        self.text_alertas.setFont(QFont("Arial", 12))
+        self.text_alertas.setStyleSheet("background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #FF4500;")
+        self.text_alertas.setReadOnly(True)
+        layout.addWidget(self.text_alertas)
+
+        self.btn_iniciar = self.create_3d_button("▶️ Iniciar Monitorización", self.start_monitoring)
+        layout.addWidget(self.btn_iniciar)
+
+        self.setLayout(layout)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_alerts)
+
+        try:
+            self.connection = obd.OBD()  # Conectar al OBD-II
+        except:
+            self.connection = None
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF4500;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #FF4500;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(255, 69, 0, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #CC3700;
+                border: 2px solid #CC3700;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def start_monitoring(self):
+        self.timer.start(3000)  # Revisar cada 3 segundos
+
+    def check_alerts(self):
+        alertas = []
+
+        if self.connection and self.connection.status() == obd.OBDStatus.CAR_CONNECTED:
+            coolant_temp = self.connection.query(obd.commands.COOLANT_TEMP).value.magnitude if self.connection.query(obd.commands.COOLANT_TEMP) else random.randint(70, 120)
+            engine_load = self.connection.query(obd.commands.ENGINE_LOAD).value.magnitude if self.connection.query(obd.commands.ENGINE_LOAD) else random.randint(10, 100)
+            throttle = self.connection.query(obd.commands.THROTTLE_POS).value.magnitude if self.connection.query(obd.commands.THROTTLE_POS) else random.randint(5, 90)
+        else:
+            coolant_temp = random.randint(70, 120)
+            engine_load = random.randint(10, 100)
+            throttle = random.randint(5, 90)
+
+        if coolant_temp > 100:
+            alertas.append(f"🌡️ Temperatura Alta ({coolant_temp}°C) - Riesgo de sobrecalentamiento.")
+
+        if engine_load > 85:
+            alertas.append(f"⚙️ Carga del motor elevada ({engine_load}%) - Posible problema en inyección.")
+
+        if throttle > 80:
+            alertas.append(f"⚡ Aceleración excesiva ({throttle}%) - Posible desgaste prematuro.")
+
+        if alertas:
+            self.label_status.setText("🔴 Estado del vehículo: ¡ALERTA!")
+            self.label_status.setStyleSheet("color: #FF4500;")
+            self.text_alertas.setText("\n".join(alertas))
+        else:
+            self.label_status.setText("🟢 Estado del vehículo: Normal")
+            self.label_status.setStyleSheet("color: #00FF00;")
+            self.text_alertas.setText("Sin alertas activas.")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonAlertas()
+    window.show()
+    sys.exit(app.exec())

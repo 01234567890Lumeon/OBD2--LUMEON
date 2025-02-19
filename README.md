@@ -902,3 +902,107 @@ if __name__ == "__main__":
     window = AutoCrewIntegration()
     window.show()
     app.exec()
+import sys
+import requests
+import json
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QLineEdit, QHBoxLayout
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+
+AUTO_CREW_CHAT_API = "https://autocrew-database.com/api/chat"  # Simulación de API
+
+class AutoCrewChat(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("OBD2 LUMEON - Chat de Soporte AutoCrew")
+        self.setGeometry(100, 100, 600, 600)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("💬 Chat en Vivo - AutoCrew")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.chat_display = QTextEdit()
+        self.chat_display.setFont(QFont("Arial", 12))
+        self.chat_display.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.chat_display.setReadOnly(True)
+        layout.addWidget(self.chat_display)
+
+        self.input_area = QLineEdit()
+        self.input_area.setPlaceholderText("Escribe tu mensaje...")
+        self.input_area.setFont(QFont("Arial", 12))
+        self.input_area.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px; padding: 5px;"
+        )
+
+        self.send_button = self.create_3d_button("📨 Enviar", self.send_message)
+
+        input_layout = QHBoxLayout()
+        input_layout.addWidget(self.input_area)
+        input_layout.addWidget(self.send_button)
+        layout.addLayout(input_layout)
+
+        self.setLayout(layout)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_chat)
+        self.timer.start(3000)  # Actualizar chat cada 3 segundos
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def send_message(self):
+        """Envía un mensaje al chat AutoCrew."""
+        message = self.input_area.text()
+        if not message:
+            return
+
+        payload = {"usuario": "UsuarioAnónimo", "mensaje": message}
+        response = requests.post(f"{AUTO_CREW_CHAT_API}/enviar", json=payload)
+
+        if response.status_code == 201:
+            self.input_area.clear()
+            self.update_chat()  # Actualizar chat después de enviar mensaje
+
+    def update_chat(self):
+        """Actualiza el chat con nuevos mensajes."""
+        response = requests.get(f"{AUTO_CREW_CHAT_API}/mensajes")
+
+        if response.status_code == 200:
+            data = response.json()
+            chat_text = "📢 **Chat en Vivo - AutoCrew**\n\n"
+            for msg in data:
+                chat_text += f"👤 {msg['usuario']}: {msg['mensaje']}\n"
+            self.chat_display.setText(chat_text)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = AutoCrewChat()
+    window.show()
+    sys.exit(app.exec())

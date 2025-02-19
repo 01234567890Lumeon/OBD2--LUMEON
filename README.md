@@ -790,3 +790,115 @@ if __name__ == "__main__":
     window = OBD2LumeonAI()
     window.show()
     app.exec()
+import json
+import requests
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QLineEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QSize
+
+AUTO_CREW_API = "https://autocrew-database.com/api/fallos"  # Simulación de API
+
+class AutoCrewIntegration(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("OBD2 LUMEON - Comunidad AutoCrew")
+        self.setGeometry(100, 100, 600, 600)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("🔗 AutoCrew - Comunidad de Diagnóstico")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.error_code_input = QLineEdit()
+        self.error_code_input.setPlaceholderText("Ingrese el código de error OBD-II o síntomas...")
+        self.error_code_input.setFont(QFont("Arial", 12))
+        self.error_code_input.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px; padding: 5px;"
+        )
+        layout.addWidget(self.error_code_input)
+
+        self.search_button = self.create_3d_button("🔍 Buscar en AutoCrew", self.search_error)
+        self.report_button = self.create_3d_button("📤 Reportar Fallo", self.report_error)
+
+        layout.addWidget(self.search_button)
+        layout.addWidget(self.report_button)
+
+        self.result_area = QTextEdit()
+        self.result_area.setFont(QFont("Arial", 12))
+        self.result_area.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.result_area.setReadOnly(True)
+        layout.addWidget(self.result_area)
+
+        self.setLayout(layout)
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setFixedSize(QSize(250, 50))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def search_error(self):
+        """Consulta la base de datos AutoCrew en línea."""
+        code = self.error_code_input.text()
+        if not code:
+            self.result_area.setText("⚠️ Ingrese un código de error o síntoma.")
+            return
+
+        response = requests.get(f"{AUTO_CREW_API}/buscar?codigo={code}")
+
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                result_text = f"🔍 Resultados de búsqueda para '{code}':\n\n"
+                for item in data:
+                    result_text += f"⚙️ Código: {item['codigo']}\n🛠️ Solución: {item['solucion']}\n🔄 Reportado por: {item['usuario']}\n\n"
+                self.result_area.setText(result_text)
+            else:
+                self.result_area.setText("❌ No se encontraron coincidencias en AutoCrew.")
+        else:
+            self.result_area.setText("⛔ Error al conectar con la comunidad AutoCrew.")
+
+    def report_error(self):
+        """Envía un fallo nuevo a la comunidad."""
+        code = self.error_code_input.text()
+        if not code:
+            self.result_area.setText("⚠️ Ingrese un código de error o síntoma.")
+            return
+
+        payload = {"codigo": code, "usuario": "UsuarioAnónimo"}
+        response = requests.post(f"{AUTO_CREW_API}/reportar", json=payload)
+
+        if response.status_code == 201:
+            self.result_area.setText("✅ Fallo reportado exitosamente en AutoCrew.")
+        else:
+            self.result_area.setText("⛔ Error al reportar el fallo.")
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = AutoCrewIntegration()
+    window.show()
+    app.exec()

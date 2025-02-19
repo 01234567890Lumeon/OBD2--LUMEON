@@ -1308,3 +1308,110 @@ if __name__ == "__main__":
     window = OBD2LumeonStats()
     window.show()
     sys.exit(app.exec())
+import sys
+import json
+import random
+import requests
+import matplotlib.pyplot as plt
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt
+
+# Simulación de API de historial de fallos OBD2
+HISTORIAL_API = "https://obd2-database.com/api/historial"  # Simulado
+
+class OBD2LumeonStats(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("📊 OBD2 LUMEON - Estadísticas")
+        self.setGeometry(100, 100, 600, 600)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("📊 Estadísticas de Diagnóstico")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.text_log = QTextEdit()
+        self.text_log.setFont(QFont("Arial", 12))
+        self.text_log.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.text_log.setReadOnly(True)
+        layout.addWidget(self.text_log)
+
+        self.btn_refresh = self.create_3d_button("🔄 Actualizar Datos", self.fetch_data)
+        layout.addWidget(self.btn_refresh)
+
+        self.btn_graph = self.create_3d_button("📈 Ver Gráficos", self.show_graphs)
+        layout.addWidget(self.btn_graph)
+
+        self.setLayout(layout)
+        self.fetch_data()
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def fetch_data(self):
+        try:
+            response = requests.get(HISTORIAL_API)
+            if response.status_code == 200:
+                data = response.json()
+                self.text_log.clear()
+                for entry in data["history"]:
+                    self.text_log.append(f"🔹 {entry['date']} - Código: {entry['code']} - {entry['description']}")
+            else:
+                self.text_log.setText("⚠️ No se pudo obtener el historial de diagnósticos.")
+        except:
+            self.text_log.setText("🚗 Datos simulados cargados.")
+            self.load_fake_data()
+
+    def load_fake_data(self):
+        fake_data = [
+            {"date": "2025-02-15", "code": "P0300", "description": "Fallo de encendido aleatorio"},
+            {"date": "2025-02-12", "code": "P0420", "description": "Eficiencia del catalizador baja"},
+            {"date": "2025-02-08", "code": "P0171", "description": "Mezcla de combustible demasiado pobre"}
+        ]
+        for entry in fake_data:
+            self.text_log.append(f"🔹 {entry['date']} - Código: {entry['code']} - {entry['description']}")
+
+    def show_graphs(self):
+        codes = ["P0300", "P0420", "P0171", "P0500", "P0455"]
+        occurrences = [random.randint(5, 20) for _ in range(len(codes))]
+
+        plt.figure(figsize=(7, 5))
+        plt.bar(codes, occurrences, color=['#00FFFF', '#00FF00', '#FFA500', '#FF4500', '#9400D3'])
+        plt.xlabel("Códigos de error")
+        plt.ylabel("Frecuencia")
+        plt.title("📊 Fallos más frecuentes en tu coche")
+        plt.grid(axis="y", linestyle="--", alpha=0.7)
+        plt.show()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonStats()
+    window.show()
+    sys.exit(app.exec())

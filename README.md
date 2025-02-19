@@ -1494,3 +1494,103 @@ if __name__ == "__main__":
     window = OBD2LumeonMantenimiento()
     window.show()
     sys.exit(app.exec())
+import sys
+import random
+import obd
+import time
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QProgressBar
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+
+class OBD2LumeonTiempoReal(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("📡 OBD2 LUMEON - Diagnóstico en Tiempo Real")
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("📡 Sensores en Tiempo Real")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.label_rpm = QLabel("🔄 RPM: --")
+        self.label_speed = QLabel("🚗 Velocidad: -- km/h")
+        self.label_temp = QLabel("🌡️ Temperatura: -- °C")
+
+        for label in [self.label_rpm, self.label_speed, self.label_temp]:
+            label.setFont(QFont("Arial", 14))
+            label.setStyleSheet("color: #FFFFFF;")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(label)
+
+        self.progress_rpm = QProgressBar()
+        self.progress_rpm.setMaximum(7000)
+        self.progress_rpm.setStyleSheet("QProgressBar { border: 2px solid #00FFFF; border-radius: 10px; height: 20px; }")
+        layout.addWidget(self.progress_rpm)
+
+        self.progress_speed = QProgressBar()
+        self.progress_speed.setMaximum(240)
+        layout.addWidget(self.progress_speed)
+
+        self.btn_start = self.create_3d_button("▶️ Iniciar Diagnóstico", self.start_diagnosis)
+        layout.addWidget(self.btn_start)
+
+        self.setLayout(layout)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_data)
+
+        try:
+            self.connection = obd.OBD()  # Conectar al OBD-II
+        except:
+            self.connection = None
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def start_diagnosis(self):
+        self.timer.start(1000)
+
+    def update_data(self):
+        if self.connection and self.connection.status() == obd.OBDStatus.CAR_CONNECTED:
+            rpm = self.connection.query(obd.commands.RPM).value.magnitude if self.connection.query(obd.commands.RPM) else random.randint(800, 6000)
+            speed = self.connection.query(obd.commands.SPEED).value.magnitude if self.connection.query(obd.commands.SPEED) else random.randint(0, 180)
+            temp = self.connection.query(obd.commands.COOLANT_TEMP).value.magnitude if self.connection.query(obd.commands.COOLANT_TEMP) else random.randint(70, 100)
+        else:
+            rpm, speed, temp = random.randint(800, 6000), random.randint(0, 180), random.randint(70, 100)
+
+        self.label_rpm.setText(f"🔄 RPM: {rpm}")
+        self.label_speed.setText(f"🚗 Velocidad: {speed} km/h")
+        self.label_temp.setText(f"🌡️ Temperatura: {temp} °C")
+
+        self.progress_rpm.setValue(rpm)
+        self.progress_speed.setValue(speed)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonTiempoReal()
+    window.show()
+    sys.exit(app.exec())

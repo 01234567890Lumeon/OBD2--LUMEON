@@ -649,3 +649,144 @@ if __name__ == "__main__":
     window = OBD2LumeonUI()
     window.show()
     app.exec()
+import json
+import obd
+import threading
+import time
+import speech_recognition as sr
+import pyttsx3
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QSize
+
+class OBD2LumeonAI(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("OBD2 LUMEON - Diagnóstico Inteligente con IA")
+        self.setGeometry(100, 100, 600, 600)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("OBD2 LUMEON AI")
+        self.label_title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.diagnosis_area = QTextEdit()
+        self.diagnosis_area.setFont(QFont("Arial", 12))
+        self.diagnosis_area.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.diagnosis_area.setReadOnly(True)
+        layout.addWidget(self.diagnosis_area)
+
+        self.btn_voice_input = self.create_3d_button("🔊 Ingresar por Voz", self.voice_input)
+        self.btn_voice_output = self.create_3d_button("📢 Leer Diagnóstico", self.voice_output)
+        self.btn_scan = self.create_3d_button("🔍 Escanear", self.scan_obd2)
+        self.btn_predict = self.create_3d_button("🤖 Predecir Fallo", self.predict_fault)
+        self.btn_clear = self.create_3d_button("🛠️ Borrar Fallos", self.clear_codes)
+
+        layout.addWidget(self.btn_voice_input)
+        layout.addWidget(self.btn_voice_output)
+        layout.addWidget(self.btn_scan)
+        layout.addWidget(self.btn_predict)
+        layout.addWidget(self.btn_clear)
+
+        self.setLayout(layout)
+
+        self.connection = obd.OBD()
+        self.history_file = "diagnosticos.json"
+        self.recognizer = sr.Recognizer()
+        self.engine = pyttsx3.init()
+
+        # Base de datos de síntomas y fallos comunes
+        self.fault_database = {
+            "ralentí inestable": "Posibles causas: Sensor de oxígeno defectuoso, válvula EGR sucia.",
+            "humo negro en el escape": "Posibles causas: Mezcla de combustible rica, sensor de flujo de aire dañado.",
+            "tirones al acelerar": "Posibles causas: Inyectores sucios, bomba de combustible débil.",
+            "falla de encendido": "Posibles causas: Bujías defectuosas, bobina de encendido en mal estado."
+        }
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setFixedSize(QSize(250, 50))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def scan_obd2(self):
+        """Escanea los códigos de error del coche y guarda en el historial"""
+        if self.connection.is_connected():
+            codes = self.connection.query(obd.commands.GET_DTC)
+            if codes.value:
+                result = "\n".join([f"Código: {code[0]}, Significado: {code[1]}" for code in codes.value])
+                self.diagnosis_area.setText(result)
+                self.save_to_history(codes.value)
+            else:
+                self.diagnosis_area.setText("No se encontraron errores.")
+        else:
+            self.diagnosis_area.setText("No se pudo conectar con el OBD-II.")
+
+    def predict_fault(self):
+        """Predice el posible fallo del coche basado en los síntomas"""
+        text = self.diagnosis_area.toPlainText().lower()
+        for symptom, fault in self.fault_database.items():
+            if symptom in text:
+                self.diagnosis_area.setText(f"Síntoma detectado: {symptom}\n{fault}")
+                return
+        self.diagnosis_area.setText("No se encontraron coincidencias. Intente con otra descripción.")
+
+    def clear_codes(self):
+        """Borra los códigos de error"""
+        if self.connection.is_connected():
+            self.connection.query(obd.commands.CLEAR_DTC)
+            self.diagnosis_area.setText("Códigos de error borrados correctamente.")
+        else:
+            self.diagnosis_area.setText("No se pudo conectar con el OBD-II.")
+
+    def voice_input(self):
+        """Permite ingresar síntomas por voz"""
+        self.diagnosis_area.setText("Escuchando...")
+        with sr.Microphone() as source:
+            self.recognizer.adjust_for_ambient_noise(source)
+            try:
+                audio = self.recognizer.listen(source)
+                symptoms = self.recognizer.recognize_google(audio, language="es-ES")
+                self.diagnosis_area.setText(f"Síntomas detectados: {symptoms}")
+                self.predict_fault()  # Ejecuta la predicción automáticamente
+            except sr.UnknownValueError:
+                self.diagnosis_area.setText("No se entendió el audio.")
+            except sr.RequestError:
+                self.diagnosis_area.setText("Error en el reconocimiento de voz.")
+
+    def voice_output(self):
+        """Lee el diagnóstico en voz alta"""
+        diagnosis_text = self.diagnosis_area.toPlainText()
+        if diagnosis_text:
+            self.engine.say(diagnosis_text)
+            self.engine.runAndWait()
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = OBD2LumeonAI()
+    window.show()
+    app.exec()

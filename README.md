@@ -279,3 +279,99 @@ if __name__ == "__main__":
     window = OBD2LumeonUI()
     window.show()
     app.exec()
+import obd
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QSize
+
+class OBD2LumeonUI(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        # Configurar ventana
+        self.setWindowTitle("OBD2 LUMEON - Diagnóstico Inteligente")
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet("background-color: #121212;")  # Fondo oscuro
+
+        # Diseño vertical
+        layout = QVBoxLayout()
+
+        # Título
+        self.label_title = QLabel("OBD2 LUMEON")
+        self.label_title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")  # Texto en neón azul
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        # Área de diagnóstico
+        self.diagnosis_area = QTextEdit()
+        self.diagnosis_area.setFont(QFont("Arial", 12))
+        self.diagnosis_area.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.diagnosis_area.setReadOnly(True)
+        layout.addWidget(self.diagnosis_area)
+
+        # Botones con efecto 3D
+        self.btn_scan = self.create_3d_button("Escanear", self.scan_obd2)
+        self.btn_clear = self.create_3d_button("Borrar Fallos", self.clear_codes)
+        self.btn_settings = self.create_3d_button("Configuración", None)
+
+        layout.addWidget(self.btn_scan)
+        layout.addWidget(self.btn_clear)
+        layout.addWidget(self.btn_settings)
+
+        self.setLayout(layout)
+
+        # Conectar con OBD-II
+        self.connection = obd.OBD()
+
+    def create_3d_button(self, text, function):
+        """Crea un botón con efecto 3D"""
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setFixedSize(QSize(200, 50))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def scan_obd2(self):
+        """Escanea los códigos de error del coche"""
+        if self.connection.is_connected():
+            codes = self.connection.query(obd.commands.GET_DTC)
+            if codes.value:
+                result = "\n".join([f"Código: {code[0]}, Significado: {code[1]}" for code in codes.value])
+                self.diagnosis_area.setText(result)
+            else:
+                self.diagnosis_area.setText("No se encontraron errores.")
+        else:
+            self.diagnosis_area.setText("No se pudo conectar con el OBD-II.")
+
+    def clear_codes(self):
+        """Borra los códigos de error"""
+        if self.connection.is_connected():
+            self.connection.query(obd.commands.CLEAR_DTC)
+            self.diagnosis_area.setText("Códigos de error borrados correctamente.")
+        else:
+            self.diagnosis_area.setText("No se pudo conectar con el OBD-II.")
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = OBD2LumeonUI()
+    window.show()
+    app.exec()

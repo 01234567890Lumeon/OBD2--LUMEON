@@ -1098,3 +1098,106 @@ if __name__ == "__main__":
     window = OBD2LumeonVoice()
     window.show()
     sys.exit(app.exec())
+import sys
+import requests
+import json
+import speech_recognition as sr
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QListWidget
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt
+
+OBD2_API = "https://obd2-database.com/api/errors"  # Simulación de API
+AUTOCREW_API = "https://autocrew-community.com/api/solutions"  # Simulación de API
+
+class OBD2LumeonCommunity(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("OBD2 LUMEON - Comunidad AutoCrew")
+        self.setGeometry(100, 100, 600, 600)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("📡 Comunidad AutoCrew - OBD2 LUMEON")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.result_display = QTextEdit()
+        self.result_display.setFont(QFont("Arial", 12))
+        self.result_display.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        self.result_display.setReadOnly(True)
+        layout.addWidget(self.result_display)
+
+        self.solution_list = QListWidget()
+        self.solution_list.setFont(QFont("Arial", 12))
+        self.solution_list.setStyleSheet(
+            "background-color: #1E1E1E; color: #00FF00; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        layout.addWidget(self.solution_list)
+
+        self.voice_button = self.create_3d_button("🎤 Activar Voz", self.voice_command)
+        layout.addWidget(self.voice_button)
+
+        self.setLayout(layout)
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def voice_command(self):
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            self.result_display.setText("🎙️ Escuchando... Di un comando como 'Buscar solución para P0300'")
+            try:
+                audio = recognizer.listen(source)
+                command = recognizer.recognize_google(audio, language="es-ES").lower()
+                self.process_command(command)
+            except sr.UnknownValueError:
+                self.result_display.setText("❌ No se entendió el comando, intenta de nuevo.")
+            except sr.RequestError:
+                self.result_display.setText("⚠️ Error en el servicio de reconocimiento.")
+
+    def process_command(self, command):
+        if "buscar solución" in command:
+            error_code = command.split()[-1]
+            self.result_display.setText(f"🔍 Buscando soluciones para el código {error_code}...")
+            response = requests.get(f"{AUTOCREW_API}/{error_code}")
+            if response.status_code == 200:
+                data = response.json()
+                self.solution_list.clear()
+                for solution in data["solutions"]:
+                    self.solution_list.addItem(f"✅ {solution['description']} - 👍 {solution['votes']} votos")
+                self.result_display.setText(f"📡 Soluciones encontradas para {error_code}:")
+            else:
+                self.result_display.setText("🚗 No se encontraron soluciones en la comunidad.")
+        else:
+            self.result_display.setText("🤔 Comando no reconocido. Intenta 'Buscar solución para P0300'.")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonCommunity()
+    window.show()
+    sys.exit(app.exec())

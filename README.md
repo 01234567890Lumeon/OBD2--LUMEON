@@ -1415,3 +1415,82 @@ if __name__ == "__main__":
     window = OBD2LumeonStats()
     window.show()
     sys.exit(app.exec())
+import sys
+import json
+import random
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QListWidget
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt
+
+# Datos simulados de mantenimiento
+MANTENIMIENTO_DATA = {
+    "P0300": {"accion": "Revisar bujías y bobinas", "piezas": ["Bujías", "Bobinas de encendido"]},
+    "P0420": {"accion": "Verificar catalizador", "piezas": ["Catalizador", "Sensor de oxígeno"]},
+    "P0171": {"accion": "Limpiar sensor MAF", "piezas": ["Sensor MAF", "Filtro de aire"]},
+    "P0500": {"accion": "Revisar sensor de velocidad", "piezas": ["Sensor de velocidad"]},
+    "P0455": {"accion": "Verificar sistema EVAP", "piezas": ["Válvula EVAP", "Mangueras de vacío"]},
+}
+
+class OBD2LumeonMantenimiento(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("🔧 OBD2 LUMEON - Mantenimiento Preventivo")
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet("background-color: #121212;")
+
+        layout = QVBoxLayout()
+
+        self.label_title = QLabel("🔧 Recomendaciones de Mantenimiento")
+        self.label_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.label_title.setStyleSheet("color: #00FFFF;")
+        self.label_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label_title)
+
+        self.lista_mantenimiento = QListWidget()
+        self.lista_mantenimiento.setFont(QFont("Arial", 12))
+        self.lista_mantenimiento.setStyleSheet(
+            "background-color: #1E1E1E; color: #FFFFFF; border: 2px solid #00FFFF; border-radius: 10px;"
+        )
+        layout.addWidget(self.lista_mantenimiento)
+
+        self.btn_check = self.create_3d_button("🔍 Ver Mantenimiento", self.show_mantenimiento)
+        layout.addWidget(self.btn_check)
+
+        self.setLayout(layout)
+
+    def create_3d_button(self, text, function):
+        btn = QPushButton(text)
+        btn.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00FFFF;
+                color: #121212;
+                border-radius: 10px;
+                border: 2px solid #00FFFF;
+                padding: 10px;
+                box-shadow: 3px 3px 10px rgba(0, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                border: 2px solid #0099CC;
+                box-shadow: none;
+            }
+        """)
+        if function:
+            btn.clicked.connect(function)
+        return btn
+
+    def show_mantenimiento(self):
+        self.lista_mantenimiento.clear()
+        for code, data in MANTENIMIENTO_DATA.items():
+            self.lista_mantenimiento.addItem(f"🔹 Código: {code}")
+            self.lista_mantenimiento.addItem(f"   ✅ Acción: {data['accion']}")
+            self.lista_mantenimiento.addItem(f"   🛠️ Piezas necesarias: {', '.join(data['piezas'])}")
+            self.lista_mantenimiento.addItem("")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = OBD2LumeonMantenimiento()
+    window.show()
+    sys.exit(app.exec())
